@@ -55,6 +55,15 @@ export interface ModelInfo {
   available: boolean;
 }
 
+export interface ModelConfig {
+  id?: string;
+  provider: string;
+  hasApiKey: boolean;
+  apiUrl: string | null;
+  modelName: string | null;
+  updatedAt?: string;
+}
+
 export interface ApiResponse<T = any> {
   data?: T;
   message?: string;

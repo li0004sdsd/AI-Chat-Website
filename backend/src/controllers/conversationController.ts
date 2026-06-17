@@ -206,7 +206,7 @@ export async function sendMessage(req: AuthRequest, res: Response): Promise<void
     }));
 
     const provider = conversation.model_provider as ModelProvider;
-    const aiResponse = await chatWithModel(provider, chatMessages, conversation.model_name || undefined);
+    const aiResponse = await chatWithModel(provider, chatMessages, conversation.model_name || undefined, userId);
 
     const assistantMessage = addMessage(id, 'assistant', aiResponse.content);
 

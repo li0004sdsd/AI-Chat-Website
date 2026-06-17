@@ -1,4 +1,5 @@
 import { config, ModelProvider } from '../config';
+import { getModelConfigByProvider } from '../models/modelConfig';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -18,31 +19,67 @@ export interface ModelInfo {
   available: boolean;
 }
 
+interface ResolvedModelConfig {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+}
+
+async function resolveModelConfig(
+  provider: ModelProvider,
+  userId?: string,
+  overrideModel?: string
+): Promise<ResolvedModelConfig> {
+  const defaultConfig = config.models[provider];
+  let apiKey = defaultConfig.apiKey;
+  let apiUrl = defaultConfig.apiUrl;
+  let model = overrideModel || defaultConfig.model;
+
+  if (userId) {
+    const userConfig = getModelConfigByProvider(userId, provider);
+    if (userConfig) {
+      if (userConfig.api_key) apiKey = userConfig.api_key;
+      if (userConfig.api_url) apiUrl = userConfig.api_url;
+      if (userConfig.model_name) model = userConfig.model_name;
+    }
+  }
+
+  if (overrideModel) {
+    model = overrideModel;
+  }
+
+  return { apiKey, apiUrl, model };
+}
+
 export async function chatWithModel(
   provider: ModelProvider,
   messages: ChatMessage[],
-  modelName?: string
+  modelName?: string,
+  userId?: string
 ): Promise<ChatResponse> {
-  const modelConfig = config.models[provider];
-  
-  if (!modelConfig.apiKey) {
+  const resolved = await resolveModelConfig(provider, userId, modelName);
+
+  if (!resolved.apiKey) {
     throw new Error(`API key for ${provider} is not configured`);
   }
 
   switch (provider) {
     case 'deepseek':
-      return chatWithDeepSeek(messages, modelName || modelConfig.model);
+      return chatWithDeepSeek(messages, resolved);
     case 'openai':
-      return chatWithOpenAI(messages, modelName || modelConfig.model);
+      return chatWithOpenAI(messages, resolved);
     case 'claude':
-      return chatWithClaude(messages, modelName || modelConfig.model);
+      return chatWithClaude(messages, resolved);
     default:
       throw new Error(`Unsupported model provider: ${provider}`);
   }
 }
 
-async function chatWithDeepSeek(messages: ChatMessage[], model: string): Promise<ChatResponse> {
-  const { apiKey, apiUrl } = config.models.deepseek;
+async function chatWithDeepSeek(
+  messages: ChatMessage[],
+  config: ResolvedModelConfig
+): Promise<ChatResponse> {
+  const { apiKey, apiUrl, model } = config;
 
   const response = await fetch(apiUrl, {
     method: 'POST',
@@ -62,7 +99,7 @@ async function chatWithDeepSeek(messages: ChatMessage[], model: string): Promise
     throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as any;
   
   return {
     content: data.choices[0]?.message?.content || '',
@@ -71,8 +108,11 @@ async function chatWithDeepSeek(messages: ChatMessage[], model: string): Promise
   };
 }
 
-async function chatWithOpenAI(messages: ChatMessage[], model: string): Promise<ChatResponse> {
-  const { apiKey, apiUrl } = config.models.openai;
+async function chatWithOpenAI(
+  messages: ChatMessage[],
+  config: ResolvedModelConfig
+): Promise<ChatResponse> {
+  const { apiKey, apiUrl, model } = config;
 
   const response = await fetch(apiUrl, {
     method: 'POST',
@@ -92,7 +132,7 @@ async function chatWithOpenAI(messages: ChatMessage[], model: string): Promise<C
     throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as any;
   
   return {
     content: data.choices[0]?.message?.content || '',
@@ -101,8 +141,11 @@ async function chatWithOpenAI(messages: ChatMessage[], model: string): Promise<C
   };
 }
 
-async function chatWithClaude(messages: ChatMessage[], model: string): Promise<ChatResponse> {
-  const { apiKey, apiUrl } = config.models.claude;
+async function chatWithClaude(
+  messages: ChatMessage[],
+  config: ResolvedModelConfig
+): Promise<ChatResponse> {
+  const { apiKey, apiUrl, model } = config;
 
   const systemMessage = messages.find(m => m.role === 'system');
   const conversationMessages = messages.filter(m => m.role !== 'system');
@@ -135,7 +178,7 @@ async function chatWithClaude(messages: ChatMessage[], model: string): Promise<C
     throw new Error(`Claude API error: ${response.status} - ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as any;
   
   return {
     content: data.content?.[0]?.text || '',
@@ -144,37 +187,53 @@ async function chatWithClaude(messages: ChatMessage[], model: string): Promise<C
   };
 }
 
-export function getAvailableModels(): ModelInfo[] {
+export async function getAvailableModels(userId?: string): Promise<ModelInfo[]> {
+  const providers: ModelProvider[] = ['deepseek', 'openai', 'claude'];
+  const availability: Record<ModelProvider, boolean> = {
+    deepseek: !!config.models.deepseek.apiKey,
+    openai: !!config.models.openai.apiKey,
+    claude: !!config.models.claude.apiKey,
+  };
+
+  if (userId) {
+    for (const provider of providers) {
+      const userConfig = getModelConfigByProvider(userId, provider);
+      if (userConfig && userConfig.api_key) {
+        availability[provider] = true;
+      }
+    }
+  }
+
   const models: ModelInfo[] = [
     {
       provider: 'deepseek',
       name: 'deepseek-chat',
       displayName: 'DeepSeek Chat',
-      available: !!config.models.deepseek.apiKey,
+      available: availability.deepseek,
     },
     {
       provider: 'openai',
       name: 'gpt-3.5-turbo',
       displayName: 'GPT-3.5 Turbo',
-      available: !!config.models.openai.apiKey,
+      available: availability.openai,
     },
     {
       provider: 'openai',
       name: 'gpt-4',
       displayName: 'GPT-4',
-      available: !!config.models.openai.apiKey,
+      available: availability.openai,
     },
     {
       provider: 'claude',
       name: 'claude-3-sonnet-20240229',
       displayName: 'Claude 3 Sonnet',
-      available: !!config.models.claude.apiKey,
+      available: availability.claude,
     },
     {
       provider: 'claude',
       name: 'claude-3-opus-20240229',
       displayName: 'Claude 3 Opus',
-      available: !!config.models.claude.apiKey,
+      available: availability.claude,
     },
   ];
 

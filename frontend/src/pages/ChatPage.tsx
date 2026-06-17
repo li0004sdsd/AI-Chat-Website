@@ -21,6 +21,12 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
+    if (conversations.length > 0 && !currentConversation) {
+      selectConversation(conversations[0].id);
+    }
+  }, [conversations, currentConversation]);
+
+  useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
@@ -32,10 +38,6 @@ export default function ChatPage() {
     try {
       const response = await conversationApi.getAll();
       setConversations(response.data.conversations);
-      
-      if (response.data.conversations.length > 0 && !currentConversation) {
-        selectConversation(response.data.conversations[0].id);
-      }
     } catch (error) {
       console.error('Failed to load conversations:', error);
     }
@@ -72,7 +74,8 @@ export default function ChatPage() {
         personaId: personaId || undefined,
       });
       
-      setConversations([response.data.conversation, ...conversations]);
+      await loadConversations();
+      
       setCurrentConversation(response.data.conversation);
       setMessages([]);
       setShowPersonaSelector(false);

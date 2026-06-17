@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { User, UserSettings, Conversation, Message, Persona, ModelInfo } from '../types';
+import type { User, UserSettings, Conversation, Message, Persona, ModelInfo, ModelConfig } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -105,6 +105,18 @@ export const modelApi = {
       '/models/test',
       { provider, message }
     ),
+
+  getConfigs: () =>
+    api.get<{ configs: ModelConfig[] }>('/models/configs'),
+
+  getConfig: (provider: string) =>
+    api.get<{ config: ModelConfig | null }>(`/models/configs/${provider}`),
+
+  saveConfig: (provider: string, data: { apiKey: string; apiUrl?: string; modelName?: string }) =>
+    api.put<{ message: string; config: ModelConfig }>(`/models/configs/${provider}`, data),
+
+  deleteConfig: (provider: string) =>
+    api.delete<{ message: string }>(`/models/configs/${provider}`),
 };
 
 export const personaApi = {
