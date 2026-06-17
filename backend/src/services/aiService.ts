@@ -1,0 +1,182 @@
+import { config, ModelProvider } from '../config';
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  content: string;
+  model: string;
+  provider: ModelProvider;
+}
+
+export interface ModelInfo {
+  provider: ModelProvider;
+  name: string;
+  displayName: string;
+  available: boolean;
+}
+
+export async function chatWithModel(
+  provider: ModelProvider,
+  messages: ChatMessage[],
+  modelName?: string
+): Promise<ChatResponse> {
+  const modelConfig = config.models[provider];
+  
+  if (!modelConfig.apiKey) {
+    throw new Error(`API key for ${provider} is not configured`);
+  }
+
+  switch (provider) {
+    case 'deepseek':
+      return chatWithDeepSeek(messages, modelName || modelConfig.model);
+    case 'openai':
+      return chatWithOpenAI(messages, modelName || modelConfig.model);
+    case 'claude':
+      return chatWithClaude(messages, modelName || modelConfig.model);
+    default:
+      throw new Error(`Unsupported model provider: ${provider}`);
+  }
+}
+
+async function chatWithDeepSeek(messages: ChatMessage[], model: string): Promise<ChatResponse> {
+  const { apiKey, apiUrl } = config.models.deepseek;
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  return {
+    content: data.choices[0]?.message?.content || '',
+    model: data.model || model,
+    provider: 'deepseek',
+  };
+}
+
+async function chatWithOpenAI(messages: ChatMessage[], model: string): Promise<ChatResponse> {
+  const { apiKey, apiUrl } = config.models.openai;
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  return {
+    content: data.choices[0]?.message?.content || '',
+    model: data.model || model,
+    provider: 'openai',
+  };
+}
+
+async function chatWithClaude(messages: ChatMessage[], model: string): Promise<ChatResponse> {
+  const { apiKey, apiUrl } = config.models.claude;
+
+  const systemMessage = messages.find(m => m.role === 'system');
+  const conversationMessages = messages.filter(m => m.role !== 'system');
+
+  const body: any = {
+    model,
+    messages: conversationMessages.map(m => ({
+      role: m.role,
+      content: m.content,
+    })),
+    max_tokens: 4096,
+  };
+
+  if (systemMessage) {
+    body.system = systemMessage.content;
+  }
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  return {
+    content: data.content?.[0]?.text || '',
+    model: data.model || model,
+    provider: 'claude',
+  };
+}
+
+export function getAvailableModels(): ModelInfo[] {
+  const models: ModelInfo[] = [
+    {
+      provider: 'deepseek',
+      name: 'deepseek-chat',
+      displayName: 'DeepSeek Chat',
+      available: !!config.models.deepseek.apiKey,
+    },
+    {
+      provider: 'openai',
+      name: 'gpt-3.5-turbo',
+      displayName: 'GPT-3.5 Turbo',
+      available: !!config.models.openai.apiKey,
+    },
+    {
+      provider: 'openai',
+      name: 'gpt-4',
+      displayName: 'GPT-4',
+      available: !!config.models.openai.apiKey,
+    },
+    {
+      provider: 'claude',
+      name: 'claude-3-sonnet-20240229',
+      displayName: 'Claude 3 Sonnet',
+      available: !!config.models.claude.apiKey,
+    },
+    {
+      provider: 'claude',
+      name: 'claude-3-opus-20240229',
+      displayName: 'Claude 3 Opus',
+      available: !!config.models.claude.apiKey,
+    },
+  ];
+
+  return models;
+}

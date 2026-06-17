@@ -1,0 +1,22 @@
+# Node
+node_modules/
+package-lock.json
+dist/
+
+# Database
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env
+.env.local
+.env.*
