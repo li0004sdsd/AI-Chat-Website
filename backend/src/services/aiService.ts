@@ -1,16 +1,11 @@
 import { config, ModelProvider } from '../config';
 import { getModelConfigByProvider } from '../models/modelConfig';
-
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
-export interface ChatResponse {
-  content: string;
-  model: string;
-  provider: ModelProvider;
-}
+import {
+  getAdapter,
+  ChatMessage,
+  ChatResponse,
+  ResolvedModelConfig,
+} from './adapters';
 
 export interface ModelInfo {
   provider: ModelProvider;
@@ -19,11 +14,7 @@ export interface ModelInfo {
   available: boolean;
 }
 
-interface ResolvedModelConfig {
-  apiKey: string;
-  apiUrl: string;
-  model: string;
-}
+export type { ChatMessage, ChatResponse };
 
 async function resolveModelConfig(
   provider: ModelProvider,
@@ -57,134 +48,18 @@ export async function chatWithModel(
   modelName?: string,
   userId?: string
 ): Promise<ChatResponse> {
+  const adapter = getAdapter(provider);
+  if (!adapter) {
+    throw new Error(`Unsupported model provider: ${provider}`);
+  }
+
   const resolved = await resolveModelConfig(provider, userId, modelName);
 
   if (!resolved.apiKey) {
     throw new Error(`API key for ${provider} is not configured`);
   }
 
-  switch (provider) {
-    case 'deepseek':
-      return chatWithDeepSeek(messages, resolved);
-    case 'openai':
-      return chatWithOpenAI(messages, resolved);
-    case 'claude':
-      return chatWithClaude(messages, resolved);
-    default:
-      throw new Error(`Unsupported model provider: ${provider}`);
-  }
-}
-
-async function chatWithDeepSeek(
-  messages: ChatMessage[],
-  config: ResolvedModelConfig
-): Promise<ChatResponse> {
-  const { apiKey, apiUrl, model } = config;
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json() as any;
-  
-  return {
-    content: data.choices[0]?.message?.content || '',
-    model: data.model || model,
-    provider: 'deepseek',
-  };
-}
-
-async function chatWithOpenAI(
-  messages: ChatMessage[],
-  config: ResolvedModelConfig
-): Promise<ChatResponse> {
-  const { apiKey, apiUrl, model } = config;
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json() as any;
-  
-  return {
-    content: data.choices[0]?.message?.content || '',
-    model: data.model || model,
-    provider: 'openai',
-  };
-}
-
-async function chatWithClaude(
-  messages: ChatMessage[],
-  config: ResolvedModelConfig
-): Promise<ChatResponse> {
-  const { apiKey, apiUrl, model } = config;
-
-  const systemMessage = messages.find(m => m.role === 'system');
-  const conversationMessages = messages.filter(m => m.role !== 'system');
-
-  const body: any = {
-    model,
-    messages: conversationMessages.map(m => ({
-      role: m.role,
-      content: m.content,
-    })),
-    max_tokens: 4096,
-  };
-
-  if (systemMessage) {
-    body.system = systemMessage.content;
-  }
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json() as any;
-  
-  return {
-    content: data.content?.[0]?.text || '',
-    model: data.model || model,
-    provider: 'claude',
-  };
+  return adapter.sendMessage(messages, resolved);
 }
 
 export async function getAvailableModels(userId?: string): Promise<ModelInfo[]> {
