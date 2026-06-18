@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSettingsStore, useAuthStore } from '../store';
+import { useSettingsStore, useAuthStore, useToastStore } from '../store';
 import { modelApi } from '../services/api';
 import type { ModelInfo } from '../types';
 
@@ -8,6 +8,7 @@ export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const { settings, updateSettings, isLoading } = useSettingsStore();
   const { user } = useAuthStore();
+  const { addToast } = useToastStore();
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -31,6 +32,7 @@ export default function SettingsPage() {
       showSaveSuccess();
     } catch (error) {
       console.error('Failed to update language:', error);
+      addToast('error', t('settings.saveFailed'));
     }
   };
 
@@ -40,6 +42,7 @@ export default function SettingsPage() {
       showSaveSuccess();
     } catch (error) {
       console.error('Failed to update theme:', error);
+      addToast('error', t('settings.saveFailed'));
     }
   };
 
@@ -49,6 +52,7 @@ export default function SettingsPage() {
       showSaveSuccess();
     } catch (error) {
       console.error('Failed to update default model:', error);
+      addToast('error', t('settings.saveFailed'));
     }
   };
 

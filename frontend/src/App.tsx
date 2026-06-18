@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSettingsStore, useAuthStore } from './store';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
+import ToastContainer from './components/ToastContainer';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
@@ -52,6 +53,7 @@ function App() {
 
   return (
     <Router>
+      <ToastContainer />
       <Routes>
         <Route
           path="/login"

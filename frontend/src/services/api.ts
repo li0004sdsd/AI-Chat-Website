@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { User, UserSettings, Conversation, Message, Persona, ModelInfo, ModelConfig } from '../types';
+import { useToastStore } from '../store';
 
 const API_BASE_URL = '/api';
 
@@ -36,6 +37,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('auth-storage');
+      useToastStore.getState().addToast('warning', '登录已过期，请重新登录');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

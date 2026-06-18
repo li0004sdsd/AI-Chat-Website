@@ -93,6 +93,7 @@ const resources = {
         available: '可用',
         unavailable: '不可用',
         saveSuccess: '设置已保存',
+        saveFailed: '设置保存失败，请重试',
       },
       models: {
         deepseek: 'DeepSeek',
@@ -203,6 +204,7 @@ const resources = {
         available: 'Available',
         unavailable: 'Unavailable',
         saveSuccess: 'Settings saved',
+        saveFailed: 'Failed to save settings, please retry',
       },
       models: {
         deepseek: 'DeepSeek',

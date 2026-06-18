@@ -56,7 +56,9 @@ export default function ChatPage() {
     try {
       const response = await conversationApi.getById(id);
       setCurrentConversation(response.data.conversation);
-      setMessages(response.data.messages.filter(m => m.role !== 'system'));
+      setMessages(
+        response.data.messages.filter(m => m.role !== 'system' && (m.role !== 'assistant' || m.content.trim()))
+      );
     } catch (error) {
       console.error('Failed to load conversation:', error);
     }
@@ -116,11 +118,14 @@ export default function ChatPage() {
     try {
       const response = await conversationApi.sendMessage(currentConversation.id, userMessage);
       
-      setMessages([
-        ...messages,
+      const assistantMsg = response.data.message;
+      const newMessages: Message[] = [
         { id: 'temp-user', conversation_id: currentConversation.id, role: 'user', content: userMessage, created_at: new Date().toISOString() },
-        response.data.message,
-      ]);
+      ];
+      if (assistantMsg.content.trim()) {
+        newMessages.push(assistantMsg);
+      }
+      setMessages([...messages, ...newMessages]);
     } catch (error) {
       console.error('Failed to send message:', error);
     } finally {
